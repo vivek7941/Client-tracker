@@ -11,17 +11,28 @@ app.use(express.json());
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/client-brief-tracker';
 
-// Connect to MongoDB - don't crash if it fails
-mongoose.connect(MONGO_URI)
-    .then(() => console.log(' Connected to MongoDB'))
-    .catch(err => console.error(' MongoDB connection error:', err.message));
+// Serverless MongoDB Connection
+let isConnected = false;
 
-// Middleware to check DB connection
-const checkDB = (req, res, next) => {
-    if (mongoose.connection.readyState !== 1) {
-        return res.status(503).json({ error: 'Database not connected. Please check your MONGO_URI in .env file.' });
+const checkDB = async (req, res, next) => {
+    if (isConnected) {
+        return next();
     }
-    next();
+
+    try {
+        if (mongoose.connection.readyState === 1) {
+            isConnected = true;
+            return next();
+        }
+        
+        await mongoose.connect(MONGO_URI);
+        isConnected = true;
+        console.log(' Connected to MongoDB');
+        next();
+    } catch (err) {
+        console.error(' MongoDB connection error:', err.message);
+        res.status(503).json({ error: 'Database not connected. Please check your MONGO_URI in Vercel.' });
+    }
 };
 
 // Get dashboard stats
